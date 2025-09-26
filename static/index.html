@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exoplanet Classifier</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .form-container {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        label {
+            display: block;
+            margin: 10px 0 5px;
+        }
+
+        input[type="number"],
+        input[type="file"],
+        select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #result,
+        #upload-result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Exoplanet Classifier</h1>
+
+    <!-- Prediction Form (Common Features Only) -->
+    <div class="form-container">
+        <h2>Predict Exoplanet Disposition</h2>
+        <form id="predict-form">
+            <label for="koi_period">Orbital Period (days):</label>
+            <input type="number" id="koi_period" name="koi_period" step="any" value="10.5" required>
+
+            <label for="koi_prad">Planetary Radius (Earth radii):</label>
+            <input type="number" id="koi_prad" name="koi_prad" step="any" value="2.0" required>
+
+            <label for="koi_teq">Equilibrium Temperature (K):</label>
+            <input type="number" id="koi_teq" name="koi_teq" step="any" value="300.0" required>
+
+            <label for="koi_insol">Insolation Flux (Earth flux):</label>
+            <input type="number" id="koi_insol" name="koi_insol" step="any" value="100.0" required>
+
+            <label for="koi_steff">Stellar Effective Temperature (K):</label>
+            <input type="number" id="koi_steff" name="koi_steff" step="any" value="5500.0" required>
+
+            <label for="koi_srad">Stellar Radius (Solar radii):</label>
+            <input type="number" id="koi_srad" name="koi_srad" step="any" value="1.0" required>
+
+            <label for="mission">Mission:</label>
+            <select id="mission" name="mission">
+                <option value="kepler">Kepler</option>
+                <option value="tess">TESS</option>
+                <option value="k2">K2</option>
+            </select>
+
+            <button type="submit">Predict</button>
+        </form>
+        <div id="result"></div>
+    </div>
+
+    <!-- Upload Form (Unchanged) -->
+    <div class="form-container">
+        <h2>Upload Dataset for Retraining</h2>
+        <form id="upload-form" enctype="multipart/form-data">
+            <label for="file">Select CSV File:</label>
+            <input type="file" id="file" name="file" accept=".csv" required>
+
+            <label for="dataset">Dataset Type:</label>
+            <select id="dataset" name="dataset">
+                <option value="kepler">Kepler</option>
+                <option value="tess">TESS</option>
+                <option value="k2">K2</option>
+            </select>
+
+            <label for="n_estimators">Number of Estimators:</label>
+            <input type="number" id="n_estimators" name="n_estimators" value="100" required>
+
+            <button type="submit">Upload and Retrain</button>
+        </form>
+        <div id="upload-result"></div>
+    </div>
+
+    <script>
+        document.getElementById('predict-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = {
+                koi_period: parseFloat(formData.get('koi_period')),
+                koi_prad: parseFloat(formData.get('koi_prad')),
+                koi_teq: parseFloat(formData.get('koi_teq')),
+                koi_insol: parseFloat(formData.get('koi_insol')),
+                koi_steff: parseFloat(formData.get('koi_steff')),
+                koi_srad: parseFloat(formData.get('koi_srad')),
+                mission: formData.get('mission')
+            };
+
+            try {
+                const response = await fetch('/api/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data })
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const result = await response.json();
+                console.log('Response:', result);
+                if (result.prediction && result.confidence != null) {
+                    document.getElementById('result').innerHTML =
+                        `Prediction: ${result.prediction} (Confidence: ${(result.confidence * 100).toFixed(2)}%)`;
+                } else {
+                    document.getElementById('result').innerHTML = `Invalid response: ${JSON.stringify(result)}`;
+                }
+            } catch (error) {
+                console.error(error);
+                document.getElementById('result').innerHTML = `Error: ${error.message}`;
+            }
+        });
+
+        document.getElementById('upload-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            try {
+                const response = await fetch('/api/upload', { method: 'POST', body: formData });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const result = await response.json();
+                document.getElementById('upload-result').innerHTML =
+                    `Retrained - Accuracy: ${(result.accuracy * 100).toFixed(2)}%, AUC: ${(result.auc * 100).toFixed(2)}%`;
+            } catch (error) {
+                document.getElementById('upload-result').innerHTML = `Error: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+
+</html>
